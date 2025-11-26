@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A股重要股东增减持分析系统 v2.2 (修复版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f3f4f6; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .tab-active { border-bottom: 3px solid #ef4444; color: #ef4444; font-weight: 700; background-color: #fef2f2; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .type-inc { color: #dc2626; background-color: #fee2e2; border: 1px solid #fecaca; }
+        .type-dec { color: #059669; background-color: #d1fae5; border: 1px solid #a7f3d0; }
+        .type-promise { color: #1d4ed8; background-color: #dbeafe; border: 1px solid #bfdbfe; }
+    </style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<nav class="bg-white shadow-sm sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-14">
+            <div class="flex items-center">
+                <i class="fa-solid fa-chart-pie text-red-600 text-xl mr-2"></i>
+                <span class="font-bold text-lg text-gray-800">重要股东增减持分析</span>
+            </div>
+            <div class="flex space-x-6 items-center h-full text-sm">
+                <button onclick="switchView('market')" id="nav-market" class="h-full px-2 border-b-2 border-red-600 text-red-600 font-bold">市场全景分析</button>
+                <button onclick="switchView('stock')" id="nav-stock" class="h-full px-2 text-gray-500 hover:text-gray-800">个股详情/F10模拟</button>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- ================= 页面一：市场全景分析 ================= -->
+    <div id="view-market" class="space-y-6">
+        <!-- 1. KPI 概览 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="card p-4 border-t-4 border-red-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="text-xs text-gray-500">今日新增增持</div>
+                        <div class="text-2xl font-bold text-red-600 mt-1">12 <span class="text-xs font-normal text-gray-400">家</span></div>
+                    </div>
+                    <div class="p-2 bg-red-50 rounded-full text-red-500"><i class="fa-solid fa-arrow-trend-up"></i></div>
+                </div>
+                <div class="mt-2 text-xs text-gray-400">环比 +20%</div>
+            </div>
+            <div class="card p-4 border-t-4 border-green-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="text-xs text-gray-500">今日新增减持</div>
+                        <div class="text-2xl font-bold text-green-600 mt-1">5 <span class="text-xs font-normal text-gray-400">家</span></div>
+                    </div>
+                    <div class="p-2 bg-green-50 rounded-full text-green-500"><i class="fa-solid fa-arrow-trend-down"></i></div>
+                </div>
+                <div class="mt-2 text-xs text-gray-400">环比 -40%</div>
+            </div>
+            <div class="card p-4 border-t-4 border-blue-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="text-xs text-gray-500">承诺不减持</div>
+                        <div class="text-2xl font-bold text-blue-600 mt-1">8 <span class="text-xs font-normal text-gray-400">家</span></div>
+                    </div>
+                    <div class="p-2 bg-blue-50 rounded-full text-blue-500"><i class="fa-solid fa-lock"></i></div>
+                </div>
+                <div class="mt-2 text-xs text-gray-400">新增市值 500亿</div>
+            </div>
+            <div class="card p-4 border-t-4 border-yellow-500">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="text-xs text-gray-500">合规红线预警</div>
+                        <div class="text-2xl font-bold text-yellow-600 mt-1">3 <span class="text-xs font-normal text-gray-400">起</span></div>
+                    </div>
+                    <div class="p-2 bg-yellow-50 rounded-full text-yellow-500"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                </div>
+                <div class="mt-2 text-xs text-gray-400">涉及分红未达标</div>
+            </div>
+        </div>
+
+        <!-- 2. 图表分析区 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="card p-5">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h3 class="font-bold text-gray-700"><i class="fa-regular fa-clock text-gray-400 mr-1"></i> 市场增减持资金流向 (近30日)</h3>
+                </div>
+                <div id="chart-money-flow" class="h-60 w-full"></div>
+            </div>
+            <div class="card p-5">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h3 class="font-bold text-gray-700"><i class="fa-solid fa-industry text-gray-400 mr-1"></i> 重点行业净增持排行</h3>
+                    <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded">金额(亿元)</span>
+                </div>
+                <div id="chart-industry-net" class="h-60 w-full"></div>
+            </div>
+            <div class="card p-5">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h3 class="font-bold text-gray-700"><i class="fa-solid fa-chart-pie text-gray-400 mr-1"></i> 五大板块公告分布</h3>
+                </div>
+                <div class="flex">
+                    <div id="chart-market-pie" class="h-60 w-2/3"></div>
+                    <div class="w-1/3 flex flex-col justify-center space-y-3 text-xs text-gray-600 pl-2 border-l border-dashed">
+                        <div><span class="w-2 h-2 rounded-full bg-red-500 inline-block mr-1"></span>沪市主板: 稳健增持</div>
+                        <div><span class="w-2 h-2 rounded-full bg-blue-500 inline-block mr-1"></span>深市主板: 活跃</div>
+                        <div><span class="w-2 h-2 rounded-full bg-yellow-500 inline-block mr-1"></span>科创板: 减持承压</div>
+                        <div><span class="w-2 h-2 rounded-full bg-green-500 inline-block mr-1"></span>创业板: 分化</div>
+                        <div><span class="w-2 h-2 rounded-full bg-purple-500 inline-block mr-1"></span>北交所: 规模较小</div>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-5">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h3 class="font-bold text-gray-700"><i class="fa-solid fa-scale-unbalanced text-gray-400 mr-1"></i> 各板块增 vs 减 意愿对比</h3>
+                </div>
+                <div id="chart-market-ratio" class="h-60 w-full"></div>
+            </div>
+        </div>
+
+        <!-- 3. 筛选列表 -->
+        <!-- 底部筛选列表：插入时间维度筛选器 -->
+        <div class="card">
+            <div class="p-4 border-b border-gray-100 flex flex-wrap gap-3 items-center bg-gray-50 rounded-t-lg">
+                <div class="font-bold text-gray-700 mr-2"><i class="fa-solid fa-filter"></i> 筛选:</div>
+        
+                <!-- 新增：时间维度筛选器 -->
+                <select id="filter-time-range" class="text-sm border rounded px-3 py-1.5 focus:ring-2 focus:ring-red-500" aria-label="时间维度">
+                    <option value="all">全部时间</option>
+                    <option value="1m">近一月</option>
+                    <option value="3m">近三月</option>
+                    <option value="6m">近半年</option>
+                    <option value="1y">近一年</option>
+                    <option value="custom">自定义</option>
+                </select>
+        
+                <!-- 自定义日期范围面板（选择“自定义”时显示） -->
+                <div id="custom-time-range" class="hidden items-center space-x-2">
+                    <input type="date" id="filter-date-start" class="text-sm border rounded px-3 py-1.5">
+                    <span class="text-gray-400 text-xs">至</span>
+                    <input type="date" id="filter-date-end" class="text-sm border rounded px-3 py-1.5">
+                    <button id="apply-custom-time" class="bg-gray-800 text-white text-xs px-3 py-1.5 rounded">应用</button>
+                </div>
+        
+                <select class="text-sm border rounded px-3 py-1.5 focus:ring-2 focus:ring-red-500">
+                    <option>所有板块</option><option>沪市主板</option><option>深市主板</option><option>科创板</option><option>创业板</option><option>北交所</option>
+                </select>
+                <select class="text-sm border rounded px-3 py-1.5 focus:ring-2 focus:ring-red-500"><option>全部行业</option><option>电子</option><option>医药</option></select>
+                <div class="ml-auto flex gap-2">
+                    <input type="text" placeholder="代码/简称" class="text-sm border rounded px-3 py-1.5 w-32">
+                    <button class="bg-red-600 text-white text-sm px-4 py-1.5 rounded hover:bg-red-700">查询</button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-gray-500 bg-gray-50 uppercase">
+                        <tr>
+                            <th class="px-6 py-3">代码/名称</th><th class="px-6 py-3">板块</th><th class="px-6 py-3">最新公告</th><th class="px-6 py-3">类型</th><th class="px-6 py-3">股东</th><th class="px-6 py-3">金额/比例</th><th class="px-6 py-3">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <tr class="hover:bg-red-50 cursor-pointer transition" onclick="switchView('stock')">
+                            <td class="px-6 py-4 font-medium">贵州茅台 <span class="text-gray-400 text-xs">600519</span></td>
+                            <td class="px-6 py-4"><span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs">沪市主板</span></td>
+                            <td class="px-6 py-4">2025-04-20</td>
+                            <td class="px-6 py-4"><span class="type-inc px-2 py-0.5 rounded text-xs font-bold">增持计划</span></td>
+                            <td class="px-6 py-4">控股股东</td>
+                            <td class="px-6 py-4 text-red-600 font-bold">10亿-20亿元</td>
+                            <td class="px-6 py-4 text-blue-600 hover:underline">详情</td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 font-medium">贝特瑞 <span class="text-gray-400 text-xs">835185</span></td>
+                            <td class="px-6 py-4"><span class="bg-purple-50 text-purple-700 px-2 py-0.5 rounded text-xs border border-purple-100">北交所</span></td>
+                            <td class="px-6 py-4">2025-04-15</td>
+                            <td class="px-6 py-4"><span class="type-inc px-2 py-0.5 rounded text-xs font-bold">增持计划</span></td>
+                            <td class="px-6 py-4">高管</td>
+                            <td class="px-6 py-4 text-red-600 font-bold">500万元</td>
+                            <td class="px-6 py-4 text-blue-600 hover:underline">详情</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= 页面二：个股详情 (含 F10 卡片 & 详情页) ================= -->
+    <div id="view-stock" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- 左侧：模拟 F10 概览卡片 -->
+        <div class="lg:col-span-1 space-y-4">
+            <div class="flex items-center space-x-2 mb-2">
+                <span class="bg-gray-800 text-white text-xs px-2 py-1 rounded">F10</span>
+                <h3 class="text-sm font-bold text-gray-600">嵌入式概览卡片</h3>
+            </div>
+            <div class="card overflow-hidden border border-gray-200 shadow-md">
+                <div class="bg-gray-50 px-4 py-3 border-b border-gray-100">
+                    <h4 class="text-xs font-bold text-gray-500 mb-2">历史统计(上市以来)</h4>
+                    <div class="flex justify-between items-center text-xs">
+                        <div class="text-center"><div class="text-gray-400">增持</div><div class="font-bold text-red-600 text-lg">12</div></div>
+                        <div class="text-center px-2 bg-red-50 rounded border border-red-100"><div class="text-red-800 scale-90 mt-1">实控人/高管</div><div class="font-bold text-red-700 text-lg">8</div></div>
+                        <div class="text-center"><div class="text-gray-400">减持</div><div class="font-bold text-green-600 text-lg">3</div></div>
+                    </div>
+                </div>
+                <div class="bg-white border-b border-gray-100">
+                    <div class="flex overflow-x-auto whitespace-nowrap scrollbar-hide py-2 px-2" id="f10-date-tabs"></div>
+                </div>
+                <div class="p-4" id="f10-content"></div>
+                <div class="px-4 py-3 bg-gray-50 border-t text-center">
+                    <button class="text-sm text-blue-600 font-medium hover:text-blue-800 w-full">查看详情与合规分析 <i class="fa-solid fa-angle-right ml-1"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：完整详情页面 -->
+        <div class="lg:col-span-2">
+            <div class="card h-full flex flex-col">
+                <div class="p-6 border-b border-gray-100 flex justify-between items-start bg-gradient-to-r from-white to-gray-50">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900 mb-1">贵州茅台 <span class="text-lg font-normal text-gray-500">600519</span></h2>
+                        <div class="flex items-center text-sm space-x-2 mt-2">
+                            <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs border">沪市主板</span>
+                            <span class="text-gray-400">|</span>
+                            <span class="text-red-600 font-bold">12次增持</span>
+                            <span class="text-green-600 font-bold">3次减持</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs text-gray-500">最新价</div>
+                        <div class="text-xl font-bold font-mono">1,720.50</div>
+                    </div>
+                </div>
+
+                <div class="border-b border-gray-200 bg-white sticky top-0 z-10">
+                    <div class="flex items-center px-2">
+                        <button id="detail-tab-left" class="text-gray-400 hover:text-gray-700 px-2 h-10 w-8" aria-label="向左滚动"><i class="fa-solid fa-chevron-left"></i></button>
+                        <div class="flex-1 overflow-x-auto whitespace-nowrap scrollbar-hide py-0" id="detail-date-tabs"></div>
+                        <button id="detail-tab-right" class="text-gray-400 hover:text-gray-700 px-2 h-10 w-8" aria-label="向右滚动"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+
+                <div class="p-6 flex-1 overflow-y-auto" id="detail-content-area"></div>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<script>
+    // --- 数据源 ---
+    const historyEvents = [
+        { date: '2025-04-20', type: 'inc', title: '增持计划', content: { role: '控股股东', amount: '10-20亿', progress: 0.15, compliance: '合规' } },
+        { date: '2024-12-10', type: 'inc', title: '增持进展', content: { role: '控股股东', amount: '已增持5亿', progress: 0.50, compliance: '合规' } },
+        { date: '2024-08-05', type: 'promise', title: '承诺不减持', content: { role: '实控人', amount: 'N/A', progress: 1, compliance: '生效中' } },
+        { date: '2023-11-15', type: 'inc', title: '增持完成', content: { role: '高管', amount: '200万', progress: 1, compliance: '已完成' } },
+        { date: '2023-05-20', type: 'dec', title: '减持计划', content: { role: '持股5%以上', amount: '<1%', progress: 0, compliance: '需关注分红' } },
+    ];
+
+    let currentEventIndex = 0;
+
+    // --- 核心逻辑 ---
+    function switchView(viewName) {
+        // 隐藏所有
+        document.getElementById('view-market').classList.add('hidden');
+        document.getElementById('view-stock').classList.add('hidden');
+        
+        // 重置 Tab 样式
+        document.getElementById('nav-market').classList.replace('text-red-600', 'text-gray-500');
+        document.getElementById('nav-market').classList.remove('border-b-2', 'border-red-600', 'font-bold');
+        document.getElementById('nav-stock').classList.replace('text-red-600', 'text-gray-500');
+        document.getElementById('nav-stock').classList.remove('border-b-2', 'border-red-600', 'font-bold');
+
+        // 显示选中
+        document.getElementById(`view-${viewName}`).classList.remove('hidden');
+        const activeNav = document.getElementById(`nav-${viewName}`);
+        activeNav.classList.replace('text-gray-500', 'text-red-600');
+        activeNav.classList.add('border-b-2', 'border-red-600', 'font-bold');
+
+        if (viewName === 'market') {
+            setTimeout(initMarketCharts, 100);
+        } else {
+            // 初始化个股详情页数据和交互
+            renderDateTabs();
+            updateDetailView(0);
+            setTimeout(initDetailChart, 100);
+            initDetailTabsControls(); // 绑定左右按钮事件
+            enableDateTabsHotkeys(); // 绑定键盘事件
+        }
+    }
+
+    // --- 更新详情页 ---
+    function updateDetailView(index) {
+        currentEventIndex = index;
+        const event = historyEvents[index];
+        renderDateTabs();
+    
+        // 1. 更新左侧 F10 小卡片
+        const f10 = document.getElementById('f10-content');
+        const badgeClass = event.type === 'inc' ? 'type-inc' : (event.type === 'dec' ? 'type-dec' : 'type-promise');
+        const amountColor = event.type === 'inc' ? 'text-red-600' : (event.type === 'dec' ? 'text-green-600' : 'text-blue-600');
+    
+        f10.innerHTML = `
+            <div class="flex justify-between mb-2">
+                <span class="${badgeClass} text-xs px-2 py-0.5 rounded font-bold">${event.title}</span>
+                <span class="text-xs text-gray-400">${event.date}</span>
+            </div>
+            <div class="text-sm space-y-2">
+                <div class="flex justify-between"><span class="text-gray-500">股东</span><span class="font-medium text-gray-900">${event.content.role}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">变动</span><span class="${amountColor} font-bold">${event.content.amount}</span></div>
+                <div class="flex justify-between">
+                    <span class="text-gray-500">进度</span>
+                    <div class="w-20 bg-gray-200 rounded-full h-2.5 mt-1.5">
+                        <div class="${event.type === 'inc' ? 'bg-red-600' : (event.type === 'dec' ? 'bg-green-600' : 'bg-blue-600')} h-2.5 rounded-full" style="width: ${Math.round((event.content.progress || 0) * 100)}%"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    
+        // 2. 更新右侧大详情页
+        const detailArea = document.getElementById('detail-content-area');
+        const statusLabel = event.content.progress >= 1 ? '已完成' : (event.type === 'promise' ? '生效中' : '进行中');
+        const statusClass = event.type === 'inc' ? 'type-inc' : (event.type === 'dec' ? 'type-dec' : 'type-promise');
+        const pct = Math.round((event.content.progress || 0) * 100);
+        const complianceChipClass = event.content.compliance.includes('需') ? 'text-yellow-700 bg-yellow-100 border-yellow-200' : 'text-green-700 bg-green-100 border-green-200';
+    
+        // 计算本轮关联公告HTML
+        const announcementsHTML = renderLifecycleAnnouncements(historyEvents, index);
+    
+        detailArea.innerHTML = `
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">${event.content.role} ${event.title}公告</h3>
+                <div class="flex flex-col items-end">
+                    <span class="${statusClass} px-3 py-1 rounded-full text-sm font-bold mb-1">${statusLabel}</span>
+                    <span class="text-xs text-gray-500">进度 ${pct}%</span>
+                </div>
+            </div>
+    
+            <!-- 合规扫描 -->
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                <h4 class="font-bold text-gray-800 text-sm mb-3 flex items-center"><i class="fa-solid fa-shield-halved text-yellow-600 mr-2"></i>监管规则合规性扫描 (指引第15号)</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="flex items-center justify-between bg-white p-3 rounded border border-yellow-100"><span class="text-sm text-gray-600">破发检测</span><span class="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded">安全</span></div>
+                    <div class="flex items-center justify-between bg-white p-3 rounded border border-yellow-100"><span class="text-sm text-gray-600">破净检测</span><span class="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded">安全</span></div>
+                    <div class="flex items-center justify-between bg-white p-3 rounded border border-yellow-100"><span class="text-sm text-gray-600">分红达标</span><span class="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded">达标</span></div>
+                </div>
+                <div class="mt-2 text-xs ${complianceChipClass} inline-block px-2 py-0.5 rounded border">合规结论：${event.content.compliance}</div>
+            </div>
+    
+            <!-- 详细信息表 -->
+            <table class="w-full text-sm text-left border rounded-lg overflow-hidden mb-6">
+                <tr class="bg-gray-50 border-b"><th class="p-3 font-medium text-gray-500">公告日期</th><td class="p-3 font-mono">${event.date}</td></tr>
+                <tr class="border-b"><th class="p-3 font-medium text-gray-500">增减主体</th><td class="p-3 font-bold text-gray-800">${event.content.role}</td></tr>
+                <tr class="bg-gray-50 border-b"><th class="p-3 font-medium text-gray-500">计划金额/数量</th><td class="p-3 ${amountColor} font-bold">${event.content.amount}</td></tr>
+                <tr class="border-b"><th class="p-3 font-medium text-gray-500">当前进度</th><td class="p-3"><div class="w-48 bg-gray-200 rounded-full h-2.5"><div class="${event.type === 'inc' ? 'bg-red-600' : (event.type === 'dec' ? 'bg-green-600' : 'bg-blue-600')} h-2.5 rounded-full" style="width: ${pct}%"></div></div></td></tr>
+            </table>
+
+            <!-- 复制按钮 -->
+            <div class="mb-6">
+                <button class="text-sm text-blue-600 font-medium hover:text-blue-800 inline-flex items-center" onclick="copyEventSummary()">
+                    <i class="fa-solid fa-copy mr-2"></i> 复制公告摘要
+                </button>
+            </div>
+    
+            <!-- 插入关联公告列表 (此前缺失部分) -->
+            <div class="mb-6">
+                ${announcementsHTML}
+            </div>
+    
+            <!-- K线图 -->
+            <div class="border rounded-lg p-4 mb-6">
+                <h4 class="font-bold text-gray-700 text-sm mb-2">公告时点股价表现</h4>
+                <div id="chart-detail-kline" class="h-48 w-full"></div>
+            </div>
+        `;
+    }
+
+    // --- 辅助函数：渲染关联公告 ---
+    function renderLifecycleAnnouncements(events, currentIndex) {
+        const current = events[currentIndex];
+        const typeLabel = current.type === 'dec' ? '减持' : '增持';
+
+        // 简单模拟关联逻辑：找同类型的
+        const related = events.filter(e => e.type === current.type || (current.type==='inc' && e.type==='promise'));
+        
+        // 按日期排序
+        related.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+        let itemsHTML = related.map(item => `
+            <li class="flex items-start justify-between py-3 border-b last:border-b-0">
+                <div class="flex items-start gap-3">
+                    <span class="inline-flex items-center justify-center w-7 h-7 rounded bg-red-50 text-red-600"><i class="fa-solid fa-file-pdf"></i></span>
+                    <div class="text-sm">
+                        <div class="font-medium text-gray-900">${item.content.role}: ${item.title}</div>
+                    </div>
+                </div>
+                <div class="text-gray-700 font-mono text-xs">${item.date}</div>
+            </li>
+        `).join('');
+
+        if (related.length === 0) itemsHTML = '<li class="py-3 text-sm text-gray-500">暂无相关公告</li>';
+
+        return `
+            <div class="border rounded-lg">
+                <div class="px-4 py-3 border-b bg-white">
+                    <div class="inline-flex items-center">
+                        <span class="text-lg font-bold text-gray-800">本轮相关公告链</span>
+                    </div>
+                </div>
+                <ul class="px-4 py-2 bg-white rounded-b-lg">
+                    ${itemsHTML}
+                </ul>
+            </div>
+        `;
+    }
+
+    // --- 交互辅助函数 (此前缺失的定义) ---
+    function renderDateTabs() {
+        const f10Tabs = document.getElementById('f10-date-tabs');
+        const detailTabs = document.getElementById('detail-date-tabs');
+
+        const iconByType = { inc: 'fa-arrow-trend-up', dec: 'fa-arrow-trend-down', promise: 'fa-lock' };
+        const colorByType = { inc: 'text-red-600', dec: 'text-green-600', promise: 'text-blue-600' };
+
+        let html = '';
+        historyEvents.forEach((event, index) => {
+            const colorClass = colorByType[event.type] || 'text-gray-600';
+            const iconClass = iconByType[event.type] || 'fa-circle';
+            const active = index === currentEventIndex ? 'tab-active' : 'text-gray-500';
+            html += `
+                <button
+                    onclick="updateDetailView(${index})"
+                    class="date-tab-item inline-block px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 ${active}"
+                    aria-selected="${index === currentEventIndex}"
+                    id="date-tab-${index}"
+                >
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid ${iconClass} ${colorClass}"></i>
+                        <span class="font-mono">${event.date}</span>
+                    </div>
+                    <div class="text-xs ${colorClass}">${event.title}</div>
+                </button>
+            `;
+        });
+        f10Tabs.innerHTML = html;
+        detailTabs.innerHTML = html;
+        
+        // 自动滚动到选中项
+        setTimeout(() => {
+            const activeBtn = document.getElementById(`date-tab-${currentEventIndex}`);
+            if(activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }, 10);
+    }
+
+    function initDetailTabsControls() {
+        const container = document.getElementById('detail-date-tabs');
+        const leftBtn = document.getElementById('detail-tab-left');
+        const rightBtn = document.getElementById('detail-tab-right');
+        
+        if(leftBtn) leftBtn.onclick = () => container.scrollBy({ left: -200, behavior: 'smooth' });
+        if(rightBtn) rightBtn.onclick = () => container.scrollBy({ left: 200, behavior: 'smooth' });
+    }
+
+    function enableDateTabsHotkeys() {
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('view-stock').classList.contains('hidden')) return;
+            if (e.key === 'ArrowLeft') {
+                const newIndex = Math.max(0, currentEventIndex - 1);
+                updateDetailView(newIndex);
+            } else if (e.key === 'ArrowRight') {
+                const newIndex = Math.min(historyEvents.length - 1, currentEventIndex + 1);
+                updateDetailView(newIndex);
+            }
+        });
+    }
+
+    function copyEventSummary() {
+        const event = historyEvents[currentEventIndex];
+        const text = `${event.date} ${event.content.role} ${event.title}: 变动金额/比例 ${event.content.amount}, 进度 ${Math.round((event.content.progress||0)*100)}%`;
+        navigator.clipboard.writeText(text).then(() => alert('摘要已复制: ' + text));
+    }
+
+    // --- 图表初始化 ---
+    function initMarketCharts() {
+        const chartFlow = echarts.init(document.getElementById('chart-money-flow'));
+        chartFlow.setOption({
+            tooltip: { trigger: 'axis' },
+            grid: { top: 30, bottom: 20, left: 40, right: 10 },
+            xAxis: { type: 'category', data: ['W1', 'W2', 'W3', 'W4'] },
+            yAxis: { type: 'value' },
+            legend: { data: ['增持(亿)', '减持(亿)'], top: 0 },
+            series: [
+                { name:'增持(亿)', type: 'bar', data: [15, 20, 25, 18], itemStyle: { color: '#ef4444' } },
+                { name:'减持(亿)', type: 'bar', data: [-5, -8, -6, -4], itemStyle: { color: '#10b981' } }
+            ]
+        });
+
+        const chartIndustry = echarts.init(document.getElementById('chart-industry-net'));
+        chartIndustry.setOption({
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+            grid: { top: 10, bottom: 20, left: 70, right: 20 },
+            xAxis: { type: 'value', splitLine: { show: false } },
+            yAxis: { type: 'category', data: ['传媒', '地产', '光伏', '银行', '医药'] },
+            series: [{ type: 'bar', data: [-12, -5, 8, 22, 35], label: { show: true, position: 'right', formatter: '{c}亿' }, itemStyle: { color: (p) => p.value > 0 ? '#ef4444' : '#10b981' } }]
+        });
+
+        const chartPie = echarts.init(document.getElementById('chart-market-pie'));
+        chartPie.setOption({
+            tooltip: { trigger: 'item' },
+            color: ['#ef4444', '#3b82f6', '#f59e0b', '#10b981', '#a855f7'],
+            series: [{ name: '公告数量', type: 'pie', radius: ['40%', '70%'], center: ['40%', '50%'], data: [{ value: 45, name: '沪市主板' }, { value: 38, name: '深市主板' }, { value: 22, name: '科创板' }, { value: 28, name: '创业板' }, { value: 8, name: '北交所' }] }]
+        });
+
+        const chartRatio = echarts.init(document.getElementById('chart-market-ratio'));
+        chartRatio.setOption({
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+            legend: { top: 0, data: ['增持意愿', '减持意愿'] },
+            grid: { top: 30, bottom: 20, left: 30, right: 10 },
+            xAxis: { type: 'category', data: ['沪主', '深主', '科创', '创业', '北交'] },
+            yAxis: { type: 'value' },
+            series: [{ name: '增持意愿', type: 'bar', stack: 'total', data: [70, 60, 30, 45, 80], itemStyle: { color: '#ef4444' } }, { name: '减持意愿', type: 'bar', stack: 'total', data: [30, 40, 70, 55, 20], itemStyle: { color: '#10b981' } }]
+        });
+    }
+
+    function initDetailChart() {
+        const chartKline = echarts.init(document.getElementById('chart-detail-kline'));
+        chartKline.setOption({
+            grid: { top: 10, bottom: 20, left: 40, right: 10 },
+            xAxis: { data: ['04-15', '04-16', '04-17', '04-18', '04-19', '04-20'] },
+            yAxis: { scale: true },
+            series: [{ type: 'candlestick', data: [[20,21,19,22], [21,22,21,23], [22,21,20,22], [21,23,21,24], [23,25,22,26], [25,24,23,25]] }]
+        });
+    }
+
+    window.onload = function() {
+        initMarketCharts();
+    };
+
+    window.addEventListener('resize', function() {
+        ['chart-money-flow','chart-industry-net','chart-market-pie','chart-market-ratio','chart-detail-kline'].forEach(id => {
+            const instance = echarts.getInstanceByDom(document.getElementById(id));
+            if(instance) instance.resize();
+        });
+    });
+
+// 方法：时间筛选初始化与应用（基于“最新公告”列）
+function initMarketTimeFilter() {
+    const rangeSelect = document.getElementById('filter-time-range');
+    if (!rangeSelect) return; // 非市场视图时不执行
+
+    const customPanel = document.getElementById('custom-time-range');
+    const applyBtn = document.getElementById('apply-custom-time');
+    const startInput = document.getElementById('filter-date-start');
+    const endInput = document.getElementById('filter-date-end');
+
+    function computeRange(val) {
+        const end = new Date();
+        const start = new Date(end);
+        switch (val) {
+            case '1m': start.setMonth(end.getMonth() - 1); break;
+            case '3m': start.setMonth(end.getMonth() - 3); break;
+            case '6m': start.setMonth(end.getMonth() - 6); break;
+            case '1y': start.setFullYear(end.getFullYear() - 1); break;
+            default: return { start: null, end: null }; // 'all' 或 'custom'
+        }
+        const norm = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        return { start: norm(start), end: norm(end) };
+    }
+
+    function onRangeChange() {
+        const val = rangeSelect.value;
+        if (val === 'custom') {
+            customPanel.classList.remove('hidden');
+        } else {
+            customPanel.classList.add('hidden');
+            const { start, end } = computeRange(val);
+            applyTimeFilter(start, end);
+        }
+    }
+
+    rangeSelect.removeEventListener('change', onRangeChange);
+    rangeSelect.addEventListener('change', onRangeChange);
+
+    if (applyBtn) {
+        applyBtn.onclick = () => {
+            const s = startInput.value ? new Date(startInput.value) : null;
+            const e = endInput.value ? new Date(endInput.value) : null;
+            if (!s || !e) {
+                alert('请选择完整的起止日期');
+                return;
+            }
+            applyTimeFilter(s, e);
+        };
+    }
+
+    // 默认：全部时间（显示全部）
+    applyTimeFilter(null, null);
+}
+
+function applyTimeFilter(startDate, endDate) {
+    const rows = document.querySelectorAll('#view-market tbody tr');
+    rows.forEach(row => {
+        const tds = row.querySelectorAll('td');
+        const dateCell = tds && tds[2]; // 第3列：最新公告
+        if (!dateCell) { row.style.display = ''; return; }
+        const text = dateCell.textContent.trim();
+        const d = new Date(text);
+        if (isNaN(d)) { row.style.display = ''; return; }
+        if (!startDate || !endDate) { row.style.display = ''; return; }
+        row.style.display = (d >= startDate && d <= endDate) ? '' : 'none';
+    });
+}
+
+// 修改：切换视图时初始化时间筛选器
+function switchView(viewName) {
+    // 隐藏所有
+    document.getElementById('view-market').classList.add('hidden');
+    document.getElementById('view-stock').classList.add('hidden');
+    
+    // 重置 Tab 样式
+    document.getElementById('nav-market').classList.replace('text-red-600', 'text-gray-500');
+    document.getElementById('nav-market').classList.remove('border-b-2', 'border-red-600', 'font-bold');
+    document.getElementById('nav-stock').classList.replace('text-red-600', 'text-gray-500');
+    document.getElementById('nav-stock').classList.remove('border-b-2', 'border-red-600', 'font-bold');
+
+    // 显示选中
+    document.getElementById(`view-${viewName}`).classList.remove('hidden');
+    const activeNav = document.getElementById(`nav-${viewName}`);
+    activeNav.classList.replace('text-gray-500', 'text-red-600');
+    activeNav.classList.add('border-b-2', 'border-red-600', 'font-bold');
+
+    if (viewName === 'market') {
+        setTimeout(initMarketCharts, 100);
+        // 初始化或重置时间筛选器
+        setTimeout(initMarketTimeFilter, 0);
+    } else {
+        // 初始化个股详情页数据和交互
+        renderDateTabs();
+        updateDetailView(0);
+        setTimeout(initDetailChart, 100);
+        initDetailTabsControls(); // 绑定左右按钮事件
+        enableDateTabsHotkeys(); // 绑定键盘事件
+    }
+}
+
+// 页面就绪时初始化一次（默认显示市场视图）
+document.addEventListener('DOMContentLoaded', () => {
+    initMarketTimeFilter();
+});
+</script>
+</body>
+</html>
